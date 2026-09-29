@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job Fiber - Banco de Currículos</title>
+    <!-- Ícone da Aba do Navegador (Favicon) -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><circle cx=%2250%22 cy=%2250%22 r=%2245%22 fill=%22%230f172a%22/><path d=%22M30 50h40M50 30v40%22 stroke=%22%2338bdf8%22 stroke-width=%228%22 stroke-linecap=%22round%22/><circle cx=%2250%22 cy=%2250%22 r=%2215%22 fill=%22%232563eb%22/><text x=%2250%22 y=%2257%22 font-size=%2218%22 font-weight=%22bold%22 fill=%22%23ffffff%22 text-anchor=%22middle%22>JF</text></svg>">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-50 font-sans h-screen flex flex-col overflow-hidden">
+
+    <!-- Barra de Navegação Superior Global (RH) -->
+    <div id="barraAdminTop" class="bg-slate-900 text-white px-6 py-2 flex items-center justify-between text-xs border-b border-slate-800">
+        <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2 font-bold tracking-wide text-white text-sm">
+                <i class="fa-solid fa-network-wired text-indigo-400"></i> JOB FIBER <span class="text-xs text-slate-400 font-normal">| Plataforma de Talentos</span>
+            </div>
+        </div>
+        <div class="flex items-center gap-3">
+            <span class="text-indigo-400 font-medium"><i class="fa-solid fa-shield-halved mr-1"></i> Área Protegida (RH)</span>
+            <button onclick="bloquearNovamente()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg font-medium transition">Bloquear / Sair</button>
+        </div>
+    </div>
+
+    <!-- Layout Principal (Painel Administrativo) -->
+    <div id="viewAdmin" class="flex h-[calc(100vh-49px)] relative">
+        <!-- Sidebar Hierárquica -->
+        <aside id="sidebar" class="w-80 bg-slate-900 text-slate-300 flex flex-col justify-between p-4 border-r border-slate-800 transition-all duration-300 relative z-20">
+            <div class="space-y-6 overflow-hidden">
+                <div class="flex items-center justify-between px-2">
+                    <h1 id="sidebarTitle" class="text-white font-bold text-base flex items-center gap-2 whitespace-nowrap">
+                        <i class="fa-solid fa-folder-open text-indigo-400"></i> <span class="sidebar-text">Áreas de Atuação</span>
+                    </h1>
+                    <div class="flex items-center gap-2">
+                        <button onclick="toggleSidebar()" title="Recolher / Expandir" class="text-slate-400 hover:text-white text-sm bg-slate-800 p-1.5 rounded-lg">
+                            <i id="sidebarIconToggle" class="fa-solid fa-chevron-left"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Botão Nova Área -->
+                <div class="px-1">
+                    <button onclick="adicionarNovaArea()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-2.5 px-3 rounded-xl transition flex items-center justify-center gap-2 shadow-sm">
+                        <i class="fa-solid fa-folder-plus"></i> <span class="sidebar-text">Nova Área</span>
+                    </button>
+                </div>
+
+                <div class="space-y-2">
+                    <p class="text-xs font-semibold text-slate-500 uppercase px-2 sidebar-text">Navegação</p>
+                    <div id="listaAreas" class="space-y-1.5 overflow-y-auto max-h-[calc(100vh-260px)] pr-1"></div>
+                </div>
+            </div>
+
+            <div class="pt-4 border-t border-slate-800 text-center sidebar-text">
+                <span class="text-xs text-slate-500">Telecom, Infra & Sabesp</span>
+            </div>
+        </aside>
+
+        <!-- Conteúdo Central -->
+        <main class="flex-1 flex flex-col bg-slate-50 overflow-hidden">
+            <header class="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center font-bold text-lg">📁</div>
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-800" id="tituloAreaAtual">Todos os Candidatos</h2>
+                        <p class="text-xs text-slate-500" id="subtituloCandidatos">0 profissionais cadastrados</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div class="relative">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400 text-sm"></i>
+                        <input type="text" id="buscaInput" oninput="filtrarCandidatos()" placeholder="Pesquisar profissional, curso ou região..." class="pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none w-80">
+                    </div>
+                    <button onclick="abrirModalCandidato()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-xl transition shadow-sm flex items-center gap-2">
+                        <i class="fa-solid fa-user-plus"></i> Novo Profissional
+                    </button>
+                </div>
+            </header>
+
+            <div class="flex-1 p-6 overflow-y-auto">
+                <div id="gridCandidatos" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Visão Pública / Portal de Inscrição (Candidato) -->
+    <div id="viewPublico" class="flex-1 bg-slate-100 overflow-y-auto p-6 hidden">
+        <div class="max-w-2xl mx-auto bg-white rounded-3xl shadow-xl border border-slate-200 p-8 space-y-6 my-4">
+            <div class="text-center space-y-2">
+                <div class="w-14 h-14 bg-indigo-600 text-white rounded-2xl flex items-center justify-center mx-auto text-2xl shadow-lg shadow-indigo-200">
+                    <i class="fa-solid fa-network-wired"></i>
+                </div>
+                <h2 class="text-2xl font-black text-slate-800">Trabalhe Conosco — Job Fiber</h2>
+                <p class="text-sm text-slate-500">Preencha o questionário abaixo para enviar o seu currículo diretamente para o nosso banco de talentos em Telecom, Infra e Sabesp.</p>
+            </div>
+
+            <form id="formCandidatoPublico" onsubmit="salvarCandidatoPublico(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Nome Completo *</label>
+                    <input type="text" id="pubNome" required placeholder="Seu nome completo" class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm">
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">E-mail *</label>
+                        <input type="email" id="pubEmail" required placeholder="seu.email@exemplo.com" class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Telefone / WhatsApp *</label>
+                        <input type="text" id="pubTel" required placeholder="(11) 99999-9999" class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm">
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Área de Atuação *</label>
+                        <select id="pubArea" required class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm bg-white"></select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Cargo Pretendido *</label>
+                        <input type="text" id="pubCargo" required placeholder="Ex: Técnico de Fibra Óptica" class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm">
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Especialidade / Tecnologia</label>
+                        <input type="text" id="pubEspecialidade" placeholder="Ex: FTTH, GPON, OTDR, Saneamento" class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Nível de Experiência</label>
+                        <select id="pubExperiencia" class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm bg-white">
+                            <option value="Menos de 1 ano">Menos de 1 ano</option>
+                            <option value="1 a 3 anos">1 a 3 anos</option>
+                            <option value="3 a 5 anos">3 a 5 anos</option>
+                            <option value="Mais de 5 anos">Mais de 5 anos</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Cursos e Certificações</label>
+                    <input type="text" id="pubCursos" placeholder="Ex: NR-10, NR-35, CNH D" class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm">
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Região / Cidade *</label>
+                        <input type="text" id="pubRegiao" required placeholder="Ex: São Paulo / SP" class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Anexar Currículo (PDF / Word) *</label>
+                        <input type="file" id="pubArquivo" accept=".pdf,.doc,.docx" required class="w-full text-xs text-slate-500 file:mr-2 file:py-3 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer border border-slate-300 rounded-xl">
+                    </div>
+                </div>
+                <div class="pt-4">
+                    <button type="submit" id="btnSalvarPub" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3.5 rounded-xl transition shadow-lg shadow-indigo-200 flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-paper-plane"></i> Enviar Candidatura
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Adicionar / Editar Candidato (Admin) -->
+    <div id="modalCandidato" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-5 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between">
+                <h3 id="modalTitulo" class="text-lg font-bold text-slate-800">Cadastrar Profissional</h3>
+                <button onclick="fecharModalCandidato()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <form id="formCandidato" onsubmit="salvarCandidatoAdmin(event)" class="space-y-4">
+                <input type="hidden" id="candidatoIdEdit">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Nome Completo</label>
+                    <input type="text" id="nomeCandidato" required class="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">E-mail</label>
+                        <input type="email" id="emailCandidato" class="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Telefone</label>
+                        <input type="text" id="telCandidato" class="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Área</label>
+                        <select id="selectArea" class="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm bg-white"></select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Cargo</label>
+                        <input type="text" id="inputCargoCustom" placeholder="Ex: Técnico de Fibra" class="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Especialidade / Tecnologia</label>
+                        <input type="text" id="especialidadeCandidato" placeholder="Ex: FTTH, GPON, OTDR" class="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Nível de Experiência</label>
+                        <select id="selectExperiencia" class="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm bg-white">
+                            <option value="Menos de 1 ano">Menos de 1 ano</option>
+                            <option value="1 a 3 anos">1 a 3 anos</option>
+                            <option value="3 a 5 anos">3 a 5 anos</option>
+                            <option value="Mais de 5 anos">Mais de 5 anos</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Cursos e Certificações</label>
+                    <input type="text" id="cursosCandidato" placeholder="Ex: NR-10, NR-35, CNH D" class="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Região / Cidade</label>
+                        <input type="text" id="regiaoCandidato" placeholder="Ex: São Paulo / SP" class="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Currículo (PDF/Word)</label>
+                        <input type="file" id="arquivoCurriculo" accept=".pdf,.doc,.docx" class="w-full text-xs text-slate-500 file:mr-2 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer">
+                    </div>
+                </div>
+                <div class="flex justify-end gap-3 pt-2">
+                    <button type="button" onclick="fecharModalCandidato()" class="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-50 transition">Cancelar</button>
+                    <button type="submit" id="btnSalvarAdmin" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-medium transition shadow-sm">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // CONFIGURAÇÕES E CREDENCIAIS
+        // ==========================================
+        const SUPABASE_URL = 'https://mxpspntzcedebyoibnrg.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_H5rDaHJKr9S3_2Bv4KbuPQ_uaXB9yDh';
+        const SENHA_RH = '170708';
+        // ==========================================
+
+        let supabaseClient = null;
+
+        let estruturaJobFiber = JSON.parse(localStorage.getItem('job_fiber_areas')) || {
+            "Fibra Óptica e Redes": [
+                "Técnico de Fibra Óptica", "Técnico de OTDR / Testes Ópticos", "Técnico de Rede Externa", 
+                "Técnico de Rede Interna", "Técnico FTTH", "Técnico GPON", "Técnico de Backbone", 
+                "Lançador de Fibra Óptica", "Ajudante de Fibra", "Técnico de Manutenção de Rede Óptica", "Técnico de Construção de Rede"
+            ],
+            "Construção e Infraestrutura": [
+                "Técnico de Obras", "Técnico em Obras Subterrâneas", "Ajudante de Dutos", "Lançador de Cabos", 
+                "Encarregado de Obras", "Supervisor de Obras", "Fiscal de Obras", "Técnico de Infraestrutura", "Técnico de Cabeamento Estruturado"
+            ],
+            "Datacenter / Smart Hands": [
+                "Analista de Smart Hands", "Técnico de Datacenter", "Técnico de Cabeamento Estruturado", "Técnico de Infraestrutura de TI"
+            ],
+            "MND — Método Não Destrutivo": [
+                "Operador de Perfuratriz MND", "Sondador", "Auxiliar de Perfuração", "Navegador de MND", 
+                "Operador de Máquinas", "Ajudante de Dutos", "Técnico de Obras Subterrâneas", "Localizador de Redes", 
+                "Técnico de Georradar", "Supervisor de MND", "Engenheiro de Perfuração", "Técnico de Topografia", "Topógrafo"
+            ],
+            "Gestão e Operação": [
+                "Supervisor de Telecom", "Coordenador de Telecom", "Gerente de Telecom", "Supervisor de Manutenção", 
+                "Supervisor de Construção", "Supervisor de Operações", "Planejamento", "Projetos", "Fiscalização"
+            ]
+        };
+
+        let areaAtual = 'TODOS';
+        let candidatosLista = [];
+        let sidebarRecolhida = false;
+
+        function initSupabase() {
+            try {
+                supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                carregarDados();
+                verificarModoInicial();
+            } catch (e) {
+                console.error('Erro ao iniciar Supabase:', e);
+            }
+        }
+
+        function verificarModoInicial() {
+            if (window.location.hash === '#publico') {
+                mudarModo('publico');
+            } else {
+                verificarSenhaAdmin();
+            }
+        }
+
+        function verificarSenhaAdmin() {
+            const senhaSalva = sessionStorage.getItem('rh_autenticado');
+            if (senhaSalva === 'true') {
+                mudarModo('admin');
+                return;
+            }
+
+            const tentativa = prompt('🔒 Área restrita do RH. Digite a senha de acesso:');
+            if (tentativa === SENHA_RH) {
+                sessionStorage.setItem('rh_autenticado', 'true');
+                mudarModo('admin');
+            } else {
+                alert('Senha incorreta ou acesso cancelado. A redirecionar para o portal público...');
+                mudarModo('publico');
+            }
+        }
+
+        function bloquearNovamente() {
+            sessionStorage.removeItem('rh_autenticado');
+            verificarSenhaAdmin();
+        }
+
+        function mudarModo(modo) {
+            const viewAdmin = document.getElementById('viewAdmin');
+            const viewPublico = document.getElementById('viewPublico');
+            const barraAdminTop = document.getElementById('barraAdminTop');
+
+            if (modo === 'admin') {
+                viewAdmin.classList.remove('hidden');
+                viewPublico.classList.add('hidden');
+                barraAdminTop.classList.remove('hidden');
+                window.location.hash = '';
+            } else {
+                viewAdmin.classList.add('hidden');
+                viewPublico.classList.remove('hidden');
+                barraAdminTop.classList.add('hidden');
+                window.location.hash = 'publico';
+                carregarSelectsPublico();
+            }
+        }
+
+        function carregarSelectsPublico() {
+            const select = document.getElementById('pubArea');
+            select.innerHTML = '<option value="">Selecione uma área</option>';
+            Object.keys(estruturaJobFiber).forEach(area => {
+                const opt = document.createElement('option');
+                opt.value = area;
+                opt.innerText = area;
+                select.appendChild(opt);
+            });
+        }
+
+        function toggleSidebar() {
+            sidebarRecolhida = !sidebarRecolhida;
+            const sidebar = document.getElementById('sidebar');
+            const icon = document.getElementById('sidebarIconToggle');
+            const textos = document.querySelectorAll('.sidebar-text');
+
+            if (sidebarRecolhida) {
+                sidebar.classList.remove('w-80');
+                sidebar.classList.add('w-20');
+                icon.classList.remove('fa-chevron-left');
+                icon.classList.add('fa-chevron-right');
+                textos.forEach(el => el.classList.add('hidden'));
+            } else {
+                sidebar.classList.remove('w-20');
+                sidebar.classList.add('w-80');
+                icon.classList.remove('fa-chevron-right');
+                icon.classList.add('fa-chevron-left');
+                textos.forEach(el => el.classList.remove('hidden'));
+            }
+        }
+
+        function adicionarNovaArea() {
+            const nomeArea = prompt('Digite o nome da nova Área de Atuação:');
+            if (nomeArea && nomeArea.trim() !== '') {
+                const areaLimpa = nomeArea.trim();
+                if (estruturaJobFiber[areaLimpa]) {
+                    alert('Esta área já existe!');
+                    return;
+                }
+                estruturaJobFiber[areaLimpa] = [];
+                localStorage.setItem('job_fiber_areas', JSON.stringify(estruturaJobFiber));
+                renderizarSidebar();
+                selecionarArea(areaLimpa);
+            }
+        }
+
+        function renomearArea(event, areaAntiga) {
+            event.stopPropagation();
+            const novoNome = prompt(`Digite o novo nome para a área "${areaAntiga}":`, areaAntiga);
+            if (novoNome && novoNome.trim() !== '' && novoNome.trim() !== areaAntiga) {
+                const nomeLimpo = novoNome.trim();
+                if (estruturaJobFiber[nomeLimpo]) {
+                    alert('Já existe uma área com esse nome!');
+                    return;
+                }
+                estruturaJobFiber[nomeLimpo] = estruturaJobFiber[areaAntiga] || [];
+                delete estruturaJobFiber[areaAntiga];
+                localStorage.setItem('job_fiber_areas', JSON.stringify(estruturaJobFiber));
+                
+                if (areaAtual === areaAntiga) {
+                    areaAtual = nomeLimpo;
+                }
+                renderizarSidebar();
+                selecionarArea(areaAtual);
+            }
+        }
+
+        function excluirArea(event, area) {
+            event.stopPropagation();
+            if (confirm(`Deseja realmente excluir a área "${area}"?`)) {
+                delete estruturaJobFiber[area];
+                localStorage.setItem('job_fiber_areas', JSON.stringify(estruturaJobFiber));
+                if (areaAtual === area) {
+                    areaAtual = 'TODOS';
+                }
+                renderizarSidebar();
+                selecionarArea(areaAtual);
+            }
+        }
+
+        async function carregarDados() {
+            try {
+                const { data, error } = await supabaseClient.from('candidatos').select('*');
+                if (error) throw error;
+                candidatosLista = data || [];
+                renderizarSidebar();
+                selecionarArea(areaAtual);
+            } catch (err) {
+                console.error('Erro ao carregar dados:', err.message);
+            }
+        }
+
+        function renderizarSidebar() {
+            const container = document.getElementById('listaAreas');
+            container.innerHTML = '';
+
+            const qtdTotal = candidatosLista.length;
+            const ativaTotal = areaAtual === 'TODOS';
+            const divTotal = document.createElement('div');
+            divTotal.className = `p-3 rounded-xl cursor-pointer transition flex items-center justify-between ${ativaTotal ? 'bg-indigo-600 text-white font-medium shadow-md' : 'hover:bg-slate-800 text-slate-300'}`;
+            divTotal.innerHTML = `
+                <span class="text-sm font-semibold flex items-center gap-2.5 truncate"><i class="fa-solid fa-users text-xs"></i> <span class="sidebar-text">Todos os Candidatos</span></span>
+                <span class="text-xs px-2 py-0.5 rounded-full ${ativaTotal ? 'bg-indigo-700 text-white' : 'bg-slate-800 text-slate-400'}">${qtdTotal}</span>
+            `;
+            divTotal.onclick = () => selecionarArea('TODOS');
+            container.appendChild(divTotal);
+
+            const hr = document.createElement('hr');
+            hr.className = 'border-slate-800 my-2';
+            container.appendChild(hr);
+            
+            Object.keys(estruturaJobFiber).forEach(area => {
+                const qtd = candidatosLista.filter(c => c.area === area).length;
+                const ativa = area === areaAtual;
+                
+                const div = document.createElement('div');
+                div.className = `p-2.5 rounded-xl cursor-pointer transition flex items-center justify-between group ${ativa ? 'bg-indigo-600 text-white font-medium shadow-md' : 'hover:bg-slate-800 text-slate-300'}`;
+                div.innerHTML = `
+                    <span class="text-sm font-semibold flex items-center gap-2.5 truncate flex-1">
+                        <i class="fa-solid fa-folder text-xs"></i> 
+                        <span class="sidebar-text truncate" title="${area}">${area}</span>
+                    </span>
+                    <div class="flex items-center gap-1.5">
+                        <span class="text-xs px-2 py-0.5 rounded-full ${ativa ? 'bg-indigo-700 text-white' : 'bg-slate-800 text-slate-400'}">${qtd}</span>
+                        <div class="hidden group-hover:flex items-center gap-1 sidebar-text">
+                            <button onclick="renomearArea(event, '${area}')" title="Renomear Área" class="p-1 hover:text-white text-slate-400 transition"><i class="fa-solid fa-pen text-[10px]"></i></button>
+                            <button onclick="excluirArea(event, '${area}')" title="Excluir Área" class="p-1 hover:text-rose-400 text-slate-400 transition"><i class="fa-solid fa-trash text-[10px]"></i></button>
+                        </div>
+                    </div>
+                `;
+                div.onclick = () => selecionarArea(area);
+                container.appendChild(div);
+            });
+        }
+
+        function selecionarArea(area) {
+            areaAtual = area;
+            document.getElementById('tituloAreaAtual').innerText = area === 'TODOS' ? 'Todos os Candidatos' : area;
+            renderizarSidebar();
+            filtrarCandidatos();
+        }
+
+        function filtrarCandidatos() {
+            const busca = document.getElementById('buscaInput').value.toLowerCase();
+            const filtrados = candidatosLista.filter(c => {
+                const matchArea = (areaAtual === 'TODOS' || c.area === areaAtual);
+                const matchBusca = (
+                    c.nome.toLowerCase().includes(busca) || 
+                    (c.cargo && c.cargo.toLowerCase().includes(busca)) || 
+                    (c.especialidade && c.especialidade.toLowerCase().includes(busca)) ||
+                    (c.cursos && c.cursos.toLowerCase().includes(busca)) ||
+                    (c.regiao && c.regiao.toLowerCase().includes(busca))
+                );
+                return matchArea && matchBusca;
+            });
+            
+            document.getElementById('subtituloCandidatos').innerText = `${filtrados.length} profissional(is) encontrado(s)`;
+            const grid = document.getElementById('gridCandidatos');
+            grid.innerHTML = '';
+
+            if (filtrados.length === 0) {
+                grid.innerHTML = `<div class="col-span-full text-center py-12 text-slate-400"><i class="fa-solid fa-folder-open text-3xl mb-2"></i><p class="text-sm">Nenhum profissional encontrado.</p></div>`;
+                return;
+            }
+
+            filtrados.forEach(c => {
+                const card = document.createElement('div');
+                card.className = 'bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition flex flex-col justify-between space-y-4';
+                card.innerHTML = `
+                    <div class="space-y-2">
+                        <div class="flex items-start justify-between">
+                            <div>
+                                <h3 class="font-bold text-slate-800 text-base">${c.nome}</h3>
+                                <span class="inline-block bg-indigo-50 text-indigo-700 text-xs font-semibold px-2 py-0.5 rounded-md mt-1">${c.cargo || 'Cargo não definido'}</span>
+                                <span class="inline-block bg-slate-100 text-slate-600 text-[10px] font-medium px-2 py-0.5 rounded-md ml-1">${c.area || 'Geral'}</span>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <button onclick='abrirModalEditarCandidato(${JSON.stringify(c)})' title="Editar Profissional" class="text-slate-300 hover:text-indigo-600 transition p-1"><i class="fa-solid fa-pen text-xs"></i></button>
+                                <button onclick="deletarCandidato(${c.id})" title="Excluir Profissional" class="text-slate-300 hover:text-rose-500 transition p-1"><i class="fa-solid fa-trash text-xs"></i></button>
+                            </div>
+                        </div>
+                        <div class="text-xs text-slate-500 space-y-1 pt-1">
+                            <p><i class="fa-solid fa-wrench mr-1 text-slate-400"></i> <strong>Especialidade:</strong> ${c.especialidade || 'Não informada'}</p>
+                            <p><i class="fa-solid fa-star mr-1 text-slate-400"></i> <strong>Experiência:</strong> ${c.experiencia || 'Não informada'}</p>
+                            <p><i class="fa-solid fa-certificate mr-1 text-slate-400"></i> <strong>Cursos:</strong> ${c.cursos || 'Nenhum informado'}</p>
+                            <p><i class="fa-solid fa-location-dot mr-1 text-slate-400"></i> <strong>Região:</strong> ${c.regiao || 'Não informada'}</p>
+                            <p><i class="fa-solid fa-envelope mr-1 text-slate-400"></i> ${c.email || 'Sem e-mail'}</p>
+                            <p><i class="fa-solid fa-phone mr-1 text-slate-400"></i> ${c.telefone || 'Sem telefone'}</p>
+                        </div>
+                    </div>
+                    <div>
+                        ${c.curriculo_url ? `<a href="${c.curriculo_url}" target="_blank" class="w-full block text-center bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-medium py-2 rounded-xl text-xs transition"><i class="fa-solid fa-file-arrow-down mr-1"></i> Baixar / Ver Currículo</a>` : '<span class="text-xs text-slate-400 block text-center py-2">Sem currículo anexado</span>'}
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function abrirModalCandidato() {
+            document.getElementById('formCandidato').reset();
+            document.getElementById('candidatoIdEdit').value = '';
+            document.getElementById('modalTitulo').innerText = 'Cadastrar Profissional';
+            const selectArea = document.getElementById('selectArea');
+            selectArea.innerHTML = '';
+            Object.keys(estruturaJobFiber).forEach(area => {
+                const opt = document.createElement('option');
+                opt.value = area;
+                opt.innerText = area;
+                if (area === areaAtual && areaAtual !== 'TODOS') opt.selected = true;
+                selectArea.appendChild(opt);
+            });
+            document.getElementById('modalCandidato').classList.remove('hidden');
+        }
+
+        function abrirModalEditarCandidato(c) {
+            document.getElementById('formCandidato').reset();
+            document.getElementById('candidatoIdEdit').value = c.id;
+            document.getElementById('modalTitulo').innerText = 'Editar Profissional';
+
+            document.getElementById('nomeCandidato').value = c.nome || '';
+            document.getElementById('emailCandidato').value = c.email || '';
+            document.getElementById('telCandidato').value = c.telefone || '';
+            document.getElementById('inputCargoCustom').value = c.cargo || '';
+            document.getElementById('especialidadeCandidato').value = c.especialidade || '';
+            document.getElementById('cursosCandidato').value = c.cursos || '';
+            document.getElementById('regiaoCandidato').value = c.regiao || '';
+            document.getElementById('selectExperiencia').value = c.experiencia || 'Menos de 1 ano';
+
+            const selectArea = document.getElementById('selectArea');
+            selectArea.innerHTML = '';
+            Object.keys(estruturaJobFiber).forEach(area => {
+                const opt = document.createElement('option');
+                opt.value = area;
+                opt.innerText = area;
+                if (area === c.area) opt.selected = true;
+                selectArea.appendChild(opt);
+            });
+
+            document.getElementById('modalCandidato').classList.remove('hidden');
+        }
+
+        function fecharModalCandidato() {
+            document.getElementById('modalCandidato').classList.add('hidden');
+        }
+
+        async function salvarCandidatoAdmin(e) {
+            e.preventDefault();
+            const btn = document.getElementById('btnSalvarAdmin');
+            const idEdit = document.getElementById('candidatoIdEdit').value;
+            btn.innerText = idEdit ? 'Atualizando...' : 'Salvando...';
+            btn.disabled = true;
+
+            try {
+                const nome = document.getElementById('nomeCandidato').value;
+                const email = document.getElementById('emailCandidato').value;
+                const telefone = document.getElementById('telCandidato').value;
+                const area = document.getElementById('selectArea').value;
+                const cargo = document.getElementById('inputCargoCustom').value;
+                const especialidade = document.getElementById('especialidadeCandidato').value;
+                const experiencia = document.getElementById('selectExperiencia').value;
+                const cursos = document.getElementById('cursosCandidato').value;
+                const regiao = document.getElementById('regiaoCandidato').value;
+                const fileInput = document.getElementById('arquivoCurriculo');
+
+                let curriculo_url = null;
+
+                if (fileInput.files.length > 0) {
+                    const file = fileInput.files[0];
+                    const fileExt = file.name.split('.').pop();
+                    const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
+
+                    const { error: uploadError } = await supabaseClient.storage
+                        .from('curriculos')
+                        .upload(fileName, file);
+
+                    if (uploadError) throw uploadError;
+
+                    const { data: publicUrlData } = supabaseClient.storage
+                        .from('curriculos')
+                        .getPublicUrl(fileName);
+
+                    curriculo_url = publicUrlData.publicUrl;
+                }
+
+                if (idEdit) {
+                    const dadosAtualizados = { nome, email, telefone, area, cargo, especialidade, experiencia, cursos, regiao };
+                    if (curriculo_url) dadosAtualizados.curriculo_url = curriculo_url;
+
+                    const { error } = await supabaseClient.from('candidatos').update(dadosAtualizados).eq('id', idEdit);
+                    if (error) throw error;
+                } else {
+                    const novoCandidato = { nome, email, telefone, area, cargo, especialidade, experiencia, cursos, regiao, curriculo_url: curriculo_url || '' };
+                    const { error } = await supabaseClient.from('candidatos').insert([novoCandidato]);
+                    if (error) throw error;
+                }
+
+                fecharModalCandidato();
+                carregarDados();
+            } catch (err) {
+                alert('Erro ao salvar profissional: ' + err.message);
+            } finally {
+                btn.innerText = 'Salvar';
+                btn.disabled = false;
+            }
+        }
+
+        async function salvarCandidatoPublico(e) {
+            e.preventDefault();
+            const btn = document.getElementById('btnSalvarPub');
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> A enviar candidatura...';
+            btn.disabled = true;
+
+            try {
+                const nome = document.getElementById('pubNome').value;
+                const email = document.getElementById('pubEmail').value;
+                const telefone = document.getElementById('pubTel').value;
+                const area = document.getElementById('pubArea').value;
+                const cargo = document.getElementById('pubCargo').value;
+                const especialidade = document.getElementById('pubEspecialidade').value;
+                const experiencia = document.getElementById('pubExperiencia').value;
+                const cursos = document.getElementById('pubCursos').value;
+                const regiao = document.getElementById('pubRegiao').value;
+                const fileInput = document.getElementById('pubArquivo');
+
+                if (!area) {
+                    alert('Por favor, selecione uma área de atuação.');
+                    return;
+                }
+
+                let curriculo_url = '';
+
+                if (fileInput.files.length > 0) {
+                    const file = fileInput.files[0];
+                    const fileExt = file.name.split('.').pop();
+                    const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
+
+                    const { error: uploadError } = await supabaseClient.storage
+                        .from('curriculos')
+                        .upload(fileName, file);
+
+                    if (uploadError) throw uploadError;
+
+                    const { data: publicUrlData } = supabaseClient.storage
+                        .from('curriculos')
+                        .getPublicUrl(fileName);
+
+                    curriculo_url = publicUrlData.publicUrl;
+                }
+
+                const novoCandidato = { nome, email, telefone, area, cargo, especialidade, experiencia, cursos, regiao, curriculo_url };
+                const { error } = await supabaseClient.from('candidatos').insert([novoCandidato]);
+                if (error) throw error;
+
+                alert('Candidatura enviada com sucesso! Obrigado por se juntar à Job Fiber.');
+                document.getElementById('formCandidatoPublico').reset();
+            } catch (err) {
+                alert('Erro ao enviar candidatura: ' + err.message);
+            } finally {
+                btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Enviar Candidatura';
+                btn.disabled = false;
+            }
+        }
+
+        async function deletarCandidato(id) {
+            if (confirm('Deseja realmente excluir este profissional?')) {
+                const { error } = await supabaseClient.from('candidatos').delete().eq('id', id);
+                if (error) {
+                    alert('Erro ao excluir: ' + error.message);
+                    return;
+                }
+                carregarDados();
+            }
+        }
+
+        window.onload = initSupabase;
+    </script>
+</body>
+</html>
